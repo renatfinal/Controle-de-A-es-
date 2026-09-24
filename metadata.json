@@ -1,0 +1,6 @@
+{
+  "name": "RF Investimentos",
+  "description": "Sistema profissional de acompanhamento de investimentos, balancete financeiro, agenda de operações e relatórios IRPF com funcionamento offline.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
