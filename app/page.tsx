@@ -23,8 +23,10 @@ import { BackupModal } from '@/components/BackupModal';
 import { LoginScreen } from '@/components/LoginScreen';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { ToastContainer, ToastMessage } from '@/components/Toast';
+import { useIsMounted } from '@/hooks/use-is-mounted';
 
 export default function Home() {
+  const isMounted = useIsMounted();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'folders' | 'balancete'>('dashboard');
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -207,6 +209,19 @@ export default function Home() {
   const dividendAssetName = dividendTicker
     ? transactions.find(t => t.ticker === dividendTicker)?.nome || dividendTicker
     : '';
+
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0B0F0C]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-black font-black text-xl flex items-center justify-center animate-pulse">
+            RF
+          </div>
+          <p className="text-xs text-zinc-400">Carregando carteira de investimentos...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0B0F0C] text-[#F3F4F6] flex flex-col md:flex-row">
