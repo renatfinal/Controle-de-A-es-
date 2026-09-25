@@ -19,6 +19,24 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+});
+
+export function isAuthCancellation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const err = error as { code?: string; message?: string };
+  const code = err.code || '';
+  const message = err.message || '';
+  return (
+    code === 'auth/user-cancelled' ||
+    code === 'auth/popup-closed-by-user' ||
+    code === 'auth/cancelled-popup-request' ||
+    message.includes('auth/user-cancelled') ||
+    message.includes('auth/popup-closed-by-user') ||
+    message.includes('user-cancelled')
+  );
+}
 
 export enum OperationType {
   CREATE = 'create',
@@ -87,8 +105,17 @@ export async function loginWithGoogle(): Promise<User | null> {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
-  } catch (error) {
-    console.error('Google Sign-in failed:', error);
+  } catch (error: unknown) {
+    if (isAuthCancellation(error)) {
+      // User cancelled or closed the login popup; handled cleanly
+      return null;
+    }
+    const err = error as { code?: string; message?: string };
+    if (err?.code === 'auth/popup-blocked') {
+      console.warn('Google Sign-in popup blocked by browser.');
+      throw new Error('A janela pop-up foi bloqueada pelo navegador. Permita pop-ups para autenticar com o Google.');
+    }
+    console.warn('Google Sign-in did not complete:', err?.message || error);
     throw error;
   }
 }

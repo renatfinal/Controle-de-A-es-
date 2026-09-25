@@ -32,6 +32,7 @@ import {
   testFirestoreConnection,
   loginWithGoogle,
   logoutFirebase,
+  isAuthCancellation,
   syncTransactionsToCloud,
   fetchTransactionsFromCloud,
   syncProfileToCloud,
@@ -216,9 +217,9 @@ export default function Home() {
         addToast('success', `Conectado ao Firebase com: ${user.email}`);
       }
     } catch (err: unknown) {
-      const error = err as { code?: string };
-      if (error?.code !== 'auth/popup-closed-by-user') {
-        addToast('error', 'Falha ao conectar com o Google / Firebase.');
+      if (!isAuthCancellation(err)) {
+        const error = err as { message?: string };
+        addToast('error', error?.message || 'Falha ao conectar com o Google / Firebase.');
       }
     }
   };

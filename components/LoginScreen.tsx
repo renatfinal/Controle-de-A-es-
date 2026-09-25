@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { UserProfile } from '@/lib/types';
-import { loginWithGoogle } from '@/lib/firebase';
+import { loginWithGoogle, isAuthCancellation } from '@/lib/firebase';
 import { User } from 'firebase/auth';
 import { Eye, EyeOff, ShieldCheck, ArrowRight, Sparkles, X } from 'lucide-react';
 
@@ -42,10 +42,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         onNotify('success', `Conectado ao Firebase com: ${user.email}`);
       }
     } catch (err: unknown) {
-      const error = err as { code?: string; message?: string };
-      if (error?.code !== 'auth/popup-closed-by-user') {
-        setErrorMsg('Erro ao autenticar com Google / Firebase. Verifique a conexão.');
-        onNotify('error', 'Falha ao autenticar com Google / Firebase.');
+      if (!isAuthCancellation(err)) {
+        const error = err as { message?: string };
+        const msg = error?.message || 'Erro ao autenticar com Google / Firebase. Verifique a conexão.';
+        setErrorMsg(msg);
+        onNotify('error', msg);
       }
     } finally {
       setIsLoggingInGoogle(false);
