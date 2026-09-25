@@ -1,6 +1,8 @@
-// RF Investimentos - Offline Service Worker
-const CACHE_NAME = 'rf-invest-v1';
-const STATIC_ASSETS = [
+// RF Investimentos - Progressive Web App Service Worker
+const CACHE_NAME = 'rf-investimentos-v2';
+const DYNAMIC_CACHE = 'rf-invest-dynamic-v2';
+
+const PRECACHE_ASSETS = [
   '/',
   '/manifest.webmanifest',
   '/icon.svg',
@@ -8,37 +10,50 @@ const STATIC_ASSETS = [
   '/pwa-512x512.png',
   '/pwa-maskable-512x512.png',
   '/apple-touch-icon.png',
-  '/favicon.ico'
+  '/favicon.ico',
 ];
 
+// Install: precache essential shell assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      return cache.addAll(PRECACHE_ASSETS);
     }).then(() => self.skipWaiting())
   );
 });
 
+// Activate: cleanup stale caches and claim clients immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys.filter((key) => key !== CACHE_NAME && key !== DYNAMIC_CACHE).map((key) => caches.delete(key))
       );
     }).then(() => self.clients.claim())
   );
 });
 
+// Listen for skip waiting messages
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Fetch: intelligent caching strategy
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // Ignore cross-origin non-http(s) or telemetry
+  // Ignore browser extensions, non-http protocols, and Firebase internal auth iframing
   if (!url.protocol.startsWith('http')) return;
+  if (url.origin !== self.location.origin && !url.hostname.includes('gstatic.com') && !url.hostname.includes('googleapis.com')) {
+    return;
+  }
 
-  // For navigation requests: Network first with Cache fallback
+  // 1. Navigation requests (HTML Pages): Network First with instant Cache Fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
@@ -52,34 +67,49 @@ self.addEventListener('fetch', (event) => {
         .catch(async () => {
           const cached = await caches.match(event.request);
           if (cached) return cached;
-          return caches.match('/');
+          const rootCached = await caches.match('/');
+          if (rootCached) return rootCached;
+          return new Response('Modo Offline RF Investimentos: Conecte-se para sincronizar novos dados.', {
+            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          });
         })
     );
     return;
   }
 
-  // For static assets: Cache first, falling back to network
+  // 2. Next.js Immutable Static Chunks & Assets (JS/CSS/Fonts): Cache-First
+  if (url.pathname.startsWith('/_next/static/') || url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(DYNAMIC_CACHE).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        });
+      })
+    );
+    return;
+  }
+
+  // 3. Media, Images, and other assets: Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Refresh cache in background (Stale-While-Revalidate)
-        fetch(event.request).then((networkResponse) => {
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
+            const clone = networkResponse.clone();
+            caches.open(DYNAMIC_CACHE).then((cache) => cache.put(event.request, clone));
           }
-        }).catch(() => {/* offline */});
-        return cachedResponse;
-      }
+          return networkResponse;
+        })
+        .catch(() => cachedResponse);
 
-      return fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return networkResponse;
-      }).catch(() => {
-        // Return offline fallback if applicable
-      });
+      return cachedResponse || fetchPromise;
     })
   );
 });
