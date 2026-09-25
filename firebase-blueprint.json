@@ -1,0 +1,51 @@
+{
+  "entities": {
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Lançamento de operação ou provento na carteira de investimentos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number", "description": "Timestamp ID único do lançamento" },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "description": "Data da operação (AAAA-MM-DD)" },
+        "nome": { "type": "string", "maxLength": 120, "description": "Nome da empresa ou fundo" },
+        "ticker": { "type": "string", "maxLength": 16, "pattern": "^[A-Z0-9]+$", "description": "Código do ativo na B3" },
+        "classe": { "type": "string", "enum": ["Ação", "FII", "BDR", "ETF", "Renda Fixa", "Outros"], "description": "Classe do ativo" },
+        "qtd": { "type": "number", "description": "Quantidade de cotas negociadas" },
+        "valorUn": { "type": "number", "description": "Preço unitário em Reais" },
+        "valorTotal": { "type": "number", "description": "Valor total da operação" },
+        "tipo": { "type": "string", "enum": ["ENTRADA", "SAIDA", "DIVIDENDO"], "description": "Tipo de movimentação" },
+        "dividendo": { "type": "number", "description": "Valor do provento/dividendo" },
+        "observacoes": { "type": "string", "maxLength": 500, "description": "Notas adicionais" },
+        "userId": { "type": "string", "maxLength": 128, "description": "UID do usuário proprietário" },
+        "accountMode": { "type": "string", "enum": ["real", "demo"], "description": "Ambiente da transação" }
+      },
+      "required": ["id", "date", "nome", "ticker", "classe", "qtd", "valorUn", "valorTotal", "tipo", "dividendo", "userId", "accountMode"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Dados do perfil do investidor titular",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "description": "UID do usuário no Firebase Auth" },
+        "nome": { "type": "string", "maxLength": 100, "description": "Nome completo do titular" },
+        "email": { "type": "string", "maxLength": 150, "description": "E-mail de contato" },
+        "telefone": { "type": "string", "maxLength": 25, "description": "Telefone ou WhatsApp formatado" }
+      },
+      "required": ["userId", "email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Coleção de operações e proventos do investidor autenticado"
+    },
+    "/users/{userId}/profile/main": {
+      "schema": "UserProfile",
+      "description": "Documento de perfil e preferências do usuário"
+    },
+    "/test/{testId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Documento para validação de conectividade com Firestore"
+    }
+  }
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { Transaction, UserProfile } from '@/lib/types';
+import { Transaction, UserProfile, AccountMode } from '@/lib/types';
 import { exportBackupJSON, exportTransactionsCSV, INITIAL_DEMO_DATA } from '@/lib/storage';
 import { X, Download, Upload, RefreshCw, Trash2, Database, ShieldCheck, AlertCircle } from 'lucide-react';
 
@@ -10,6 +10,7 @@ interface BackupModalProps {
   onClose: () => void;
   transactions: Transaction[];
   userProfile: UserProfile | null;
+  accountMode?: AccountMode;
   onRestoreData: (newTransactions: Transaction[], newProfile?: UserProfile) => void;
   onNotify: (type: 'success' | 'error' | 'info', msg: string) => void;
 }
@@ -19,6 +20,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   onClose,
   transactions,
   userProfile,
+  accountMode = 'real',
   onRestoreData,
   onNotify,
 }) => {
@@ -30,8 +32,8 @@ export const BackupModal: React.FC<BackupModalProps> = ({
 
   const handleExportJSON = () => {
     try {
-      exportBackupJSON(transactions, userProfile);
-      onNotify('success', 'Backup JSON baixado com sucesso!');
+      exportBackupJSON(transactions, userProfile, accountMode);
+      onNotify('success', `Backup JSON (${accountMode === 'demo' ? 'Conta Demo' : 'Conta Real'}) baixado com sucesso!`);
     } catch {
       onNotify('error', 'Falha ao gerar arquivo de backup.');
     }

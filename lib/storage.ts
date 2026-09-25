@@ -1,6 +1,9 @@
-import { Transaction, UserProfile } from './types';
+import { Transaction, UserProfile, AccountMode } from './types';
 
-const DATA_KEY = 'invest_app_data';
+const MODE_KEY = 'invest_app_account_mode';
+const REAL_DATA_KEY = 'invest_app_data_real';
+const DEMO_DATA_KEY = 'invest_app_data_demo';
+const LEGACY_DATA_KEY = 'invest_app_data';
 const USER_KEY = 'invest_app_user';
 
 export const INITIAL_DEMO_DATA: Transaction[] = [
@@ -102,30 +105,85 @@ export const INITIAL_DEMO_DATA: Transaction[] = [
   }
 ];
 
-export function loadTransactions(): Transaction[] {
-  if (typeof window === 'undefined') return [];
+export function getAccountMode(): AccountMode {
+  if (typeof window === 'undefined') return 'real';
   try {
-    const raw = localStorage.getItem(DATA_KEY);
-    if (!raw) {
-      // Seed with initial demo portfolio so app isn't blank
-      localStorage.setItem(DATA_KEY, JSON.stringify(INITIAL_DEMO_DATA));
-      return INITIAL_DEMO_DATA;
+    const stored = localStorage.getItem(MODE_KEY);
+    if (stored === 'demo' || stored === 'real') return stored;
+    return 'real';
+  } catch {
+    return 'real';
+  }
+}
+
+export function setAccountMode(mode: AccountMode): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch (err) {
+    console.error('Error saving account mode:', err);
+  }
+}
+
+export function loadTransactions(mode?: AccountMode): Transaction[] {
+  if (typeof window === 'undefined') return [];
+  const currentMode = mode || getAccountMode();
+  const targetKey = currentMode === 'demo' ? DEMO_DATA_KEY : REAL_DATA_KEY;
+
+  try {
+    const raw = localStorage.getItem(targetKey);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
     }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+
+    if (currentMode === 'demo') {
+      // Seed demo account with initial sample assets
+      localStorage.setItem(DEMO_DATA_KEY, JSON.stringify(INITIAL_DEMO_DATA));
+      return INITIAL_DEMO_DATA;
+    } else {
+      // Real account: check if there was prior data in legacy key
+      const legacyRaw = localStorage.getItem(LEGACY_DATA_KEY);
+      if (legacyRaw) {
+        try {
+          const parsed = JSON.parse(legacyRaw);
+          if (Array.isArray(parsed)) {
+            localStorage.setItem(REAL_DATA_KEY, JSON.stringify(parsed));
+            return parsed;
+          }
+        } catch {}
+      }
+      // Fresh real account
+      localStorage.setItem(REAL_DATA_KEY, JSON.stringify([]));
+      return [];
+    }
   } catch (err) {
     console.error('Error loading transactions from localStorage:', err);
     return [];
   }
 }
 
-export function saveTransactions(transactions: Transaction[]): void {
+export function saveTransactions(transactions: Transaction[], mode?: AccountMode): void {
   if (typeof window === 'undefined') return;
+  const currentMode = mode || getAccountMode();
+  const targetKey = currentMode === 'demo' ? DEMO_DATA_KEY : REAL_DATA_KEY;
+
   try {
-    localStorage.setItem(DATA_KEY, JSON.stringify(transactions));
+    localStorage.setItem(targetKey, JSON.stringify(transactions));
+    if (currentMode === 'real') {
+      localStorage.setItem(LEGACY_DATA_KEY, JSON.stringify(transactions));
+    }
   } catch (err) {
     console.error('Error saving transactions to localStorage:', err);
   }
+}
+
+export function resetDemoData(): Transaction[] {
+  if (typeof window === 'undefined') return INITIAL_DEMO_DATA;
+  try {
+    localStorage.setItem(DEMO_DATA_KEY, JSON.stringify(INITIAL_DEMO_DATA));
+  } catch {}
+  return INITIAL_DEMO_DATA;
 }
 
 export function loadUserProfile(): UserProfile | null {
@@ -149,10 +207,12 @@ export function saveUserProfile(profile: UserProfile): void {
   }
 }
 
-export function exportBackupJSON(transactions: Transaction[], profile?: UserProfile | null): void {
+export function exportBackupJSON(transactions: Transaction[], profile?: UserProfile | null, mode?: AccountMode): void {
+  const currentMode = mode || getAccountMode();
   const payload = {
     appName: 'RF Investimentos',
     version: '1.0',
+    accountMode: currentMode,
     exportDate: new Date().toISOString(),
     profile: profile || null,
     transactions,
@@ -160,7 +220,7 @@ export function exportBackupJSON(transactions: Transaction[], profile?: UserProf
   const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
   const downloadAnchor = document.createElement('a');
   downloadAnchor.setAttribute('href', dataStr);
-  downloadAnchor.setAttribute('download', `RF_Investimentos_Backup_${new Date().toISOString().slice(0, 10)}.json`);
+  downloadAnchor.setAttribute('download', `RF_Investimentos_${currentMode === 'demo' ? 'DEMO_' : 'REAL_'}${new Date().toISOString().slice(0, 10)}.json`);
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();

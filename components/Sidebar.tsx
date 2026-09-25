@@ -1,17 +1,20 @@
 'use client';
 
 import React from 'react';
-import { Calendar, FolderKanban, BarChart3, User, Database, LogOut } from 'lucide-react';
+import { Calendar, FolderKanban, BarChart3, PieChart, User, Database, LogOut, Cloud, CloudCheck } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
-import { UserProfile } from '@/lib/types';
+import { UserProfile, AccountMode } from '@/lib/types';
+import { User as FirebaseUser } from 'firebase/auth';
 
 interface SidebarProps {
-  activeTab: 'dashboard' | 'folders' | 'balancete';
-  onSelectTab: (tab: 'dashboard' | 'folders' | 'balancete') => void;
+  activeTab: 'dashboard' | 'folders' | 'balancete' | 'graficos';
+  onSelectTab: (tab: 'dashboard' | 'folders' | 'balancete' | 'graficos') => void;
   onOpenProfile: () => void;
   onOpenBackupModal: () => void;
   onLogout: () => void;
   userProfile: UserProfile | null;
+  accountMode: AccountMode;
+  firebaseUser?: FirebaseUser | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -21,6 +24,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenBackupModal,
   onLogout,
   userProfile,
+  accountMode,
+  firebaseUser,
 }) => {
   return (
     <>
@@ -39,9 +44,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
               <div className="flex flex-col">
                 <span className="font-bold text-base text-emerald-400 leading-tight">RF Investimentos</span>
-                <span className="text-[11px] text-zinc-400 truncate max-w-[130px]">
-                  {userProfile?.nome ? userProfile.nome.split(' ')[0] : 'Carteira Pessoal'}
-                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[11px] text-zinc-400 truncate max-w-[80px]">
+                    {userProfile?.nome ? userProfile.nome.split(' ')[0] : 'Carteira'}
+                  </span>
+                  <button
+                    onClick={onOpenProfile}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border transition ${
+                      accountMode === 'demo'
+                        ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+                        : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                    }`}
+                    title="Alternar entre Conta Demo e Conta Real no Perfil"
+                  >
+                    <span>{accountMode === 'demo' ? 'DEMO' : 'REAL'}</span>
+                  </button>
+                  <button
+                    onClick={onOpenProfile}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold border transition ${
+                      firebaseUser
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                        : 'bg-zinc-800/60 text-zinc-400 border-zinc-700'
+                    }`}
+                    title={firebaseUser ? `Conectado ao Firebase (${firebaseUser.email})` : 'Conectar Firebase'}
+                  >
+                    {firebaseUser ? (
+                      <CloudCheck className="w-2.5 h-2.5 text-emerald-400" />
+                    ) : (
+                      <Cloud className="w-2.5 h-2.5 text-zinc-400" />
+                    )}
+                    <span>Nuvem</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -82,6 +116,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <BarChart3 className="w-4 h-4 text-emerald-400" />
               <span>Balancete</span>
+            </button>
+
+            <button
+              onClick={() => onSelectTab('graficos')}
+              className={`flex items-center justify-start gap-2.5 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'graficos'
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold'
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+              }`}
+            >
+              <PieChart className="w-4 h-4 text-emerald-400" />
+              <span>Gráficos</span>
             </button>
           </nav>
         </div>
@@ -126,7 +172,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
             RF
           </button>
           <div>
-            <h1 className="font-bold text-sm text-white leading-tight">RF Investimentos</h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="font-bold text-sm text-white leading-tight">RF Investimentos</h1>
+              <button
+                onClick={onOpenProfile}
+                className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border uppercase ${
+                  accountMode === 'demo'
+                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                    : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                }`}
+              >
+                {accountMode === 'demo' ? 'DEMO' : 'REAL'}
+              </button>
+              {firebaseUser && (
+                <button
+                  onClick={onOpenProfile}
+                  className="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-emerald-500/15 text-emerald-400 border-emerald-500/30 flex items-center gap-0.5"
+                  title={`Firebase conectado: ${firebaseUser.email}`}
+                >
+                  <CloudCheck className="w-2.5 h-2.5 text-emerald-400" />
+                  <span>Nuvem</span>
+                </button>
+              )}
+            </div>
             <p className="text-[10px] text-zinc-400">
               {userProfile?.nome ? userProfile.nome.split(' ')[0] : 'Carteira'}
             </p>
@@ -182,14 +250,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <button
           onClick={() => onSelectTab('balancete')}
-          className={`flex-1 py-1.5 px-2 flex flex-col items-center justify-center gap-1 rounded-xl transition ${
+          className={`flex-1 py-1.5 px-1.5 flex flex-col items-center justify-center gap-1 rounded-xl transition ${
             activeTab === 'balancete'
               ? 'text-emerald-400 font-bold bg-emerald-500/10'
               : 'text-zinc-400 hover:text-zinc-200'
           }`}
         >
-          <BarChart3 className="w-5 h-5" />
-          <span className="text-[10px]">Balancete</span>
+          <BarChart3 className="w-4 h-4" />
+          <span className="text-[9px]">Balancete</span>
+        </button>
+
+        <button
+          onClick={() => onSelectTab('graficos')}
+          className={`flex-1 py-1.5 px-1.5 flex flex-col items-center justify-center gap-1 rounded-xl transition ${
+            activeTab === 'graficos'
+              ? 'text-emerald-400 font-bold bg-emerald-500/10'
+              : 'text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <PieChart className="w-4 h-4" />
+          <span className="text-[9px]">Gráficos</span>
         </button>
       </nav>
     </>

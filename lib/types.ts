@@ -1,5 +1,6 @@
 export type TransactionType = 'ENTRADA' | 'SAIDA' | 'DIVIDENDO';
 export type AssetClass = 'Ação' | 'FII' | 'BDR' | 'ETF' | 'Renda Fixa' | 'Outros';
+export type AccountMode = 'real' | 'demo';
 
 export interface Transaction {
   id: number;

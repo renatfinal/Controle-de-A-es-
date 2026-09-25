@@ -1,18 +1,21 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Transaction, UserProfile } from '@/lib/types';
+import { Transaction, UserProfile, AccountMode } from '@/lib/types';
 import {
   loadTransactions,
   saveTransactions,
   loadUserProfile,
   saveUserProfile,
+  getAccountMode,
+  setAccountMode,
   INITIAL_DEMO_DATA,
 } from '@/lib/storage';
 import { Sidebar } from '@/components/Sidebar';
 import { DashboardCalendar } from '@/components/DashboardCalendar';
 import { FoldersGrid } from '@/components/FoldersGrid';
 import { BalanceteView } from '@/components/BalanceteView';
+import { PortfolioCharts } from '@/components/PortfolioCharts';
 import { TransactionModal } from '@/components/TransactionModal';
 import { DividendModal } from '@/components/DividendModal';
 import { EditTickerModal } from '@/components/EditTickerModal';
@@ -24,10 +27,25 @@ import { LoginScreen } from '@/components/LoginScreen';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { ToastContainer, ToastMessage } from '@/components/Toast';
 import { useIsMounted } from '@/hooks/use-is-mounted';
+import {
+  auth,
+  testFirestoreConnection,
+  loginWithGoogle,
+  logoutFirebase,
+  syncTransactionsToCloud,
+  fetchTransactionsFromCloud,
+  syncProfileToCloud,
+} from '@/lib/firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 export default function Home() {
   const isMounted = useIsMounted();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'folders' | 'balancete'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'folders' | 'balancete' | 'graficos'>('dashboard');
+
+  const [accountMode, setAccountModeState] = useState<AccountMode>(() => {
+    if (typeof window === 'undefined') return 'real';
+    return getAccountMode();
+  });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     if (typeof window === 'undefined') return [];
@@ -50,6 +68,8 @@ export default function Home() {
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
 
   // Modals state
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -92,10 +112,124 @@ export default function Home() {
     }
   }, []);
 
+  // Test Firestore connectivity on boot
+  useEffect(() => {
+    testFirestoreConnection().catch(() => {});
+  }, []);
+
+  // Listen to Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      if (user) {
+        setIsLoggedIn(true);
+        sessionStorage.setItem('rf_session_active', 'true');
+        setUserProfile(prev => {
+          if (!prev || !prev.email) {
+            const initial: UserProfile = {
+              nome: user.displayName || 'Investidor',
+              email: user.email || '',
+              telefone: user.phoneNumber || '',
+              senha: '',
+            };
+            saveUserProfile(initial);
+            return initial;
+          }
+          return prev;
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Cloud Synchronization Handlers
+  const handleCloudSync = async () => {
+    if (!firebaseUser) {
+      addToast('error', 'Conecte sua conta Google no Perfil para sincronizar com a nuvem.');
+      return;
+    }
+    try {
+      setIsSyncingCloud(true);
+      await syncTransactionsToCloud(firebaseUser.uid, transactions, accountMode);
+      if (userProfile) {
+        await syncProfileToCloud(firebaseUser.uid, userProfile);
+      }
+      addToast('success', `Carteira (${accountMode === 'demo' ? 'Conta Demo' : 'Conta Real'}) sincronizada no Firebase!`);
+    } catch {
+      addToast('error', 'Falha ao sincronizar com o Firebase. Verifique sua conexão.');
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
+
+  const handleCloudFetch = async () => {
+    if (!firebaseUser) {
+      addToast('error', 'Conecte sua conta Google para baixar dados da nuvem.');
+      return;
+    }
+    try {
+      setIsSyncingCloud(true);
+      const cloudTxs = await fetchTransactionsFromCloud(firebaseUser.uid, accountMode);
+      if (cloudTxs.length > 0) {
+        handleTransactionsChange(cloudTxs);
+        addToast('success', `${cloudTxs.length} lançamento(s) baixados da nuvem Firebase!`);
+      } else {
+        addToast('info', `Nenhum lançamento encontrado na nuvem para a ${accountMode === 'demo' ? 'Conta Demo' : 'Conta Real'}.`);
+      }
+    } catch {
+      addToast('error', 'Falha ao buscar dados do Firebase.');
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      const user = await loginWithGoogle();
+      if (user) {
+        setFirebaseUser(user);
+        setIsLoggedIn(true);
+        sessionStorage.setItem('rf_session_active', 'true');
+        addToast('success', `Conectado ao Firebase com: ${user.email}`);
+      }
+    } catch (err: unknown) {
+      const error = err as { code?: string };
+      if (error?.code !== 'auth/popup-closed-by-user') {
+        addToast('error', 'Falha ao conectar com o Google / Firebase.');
+      }
+    }
+  };
+
+  const handleGoogleLogout = async () => {
+    await logoutFirebase();
+    setFirebaseUser(null);
+    addToast('info', 'Desconectado da nuvem Firebase.');
+  };
+
   // Save changes to localStorage whenever transactions change
   const handleTransactionsChange = (newTxs: Transaction[]) => {
     setTransactions(newTxs);
-    saveTransactions(newTxs);
+    saveTransactions(newTxs, accountMode);
+  };
+
+  // Switch between Conta Demo and Conta Real
+  const handleSwitchAccountMode = (mode: AccountMode) => {
+    if (mode === accountMode) {
+      addToast('info', `Você já está na ${mode === 'demo' ? 'Conta Demo' : 'Conta Real'}.`);
+      return;
+    }
+    // Ensure current transactions are persisted before switching
+    saveTransactions(transactions, accountMode);
+    setAccountMode(mode);
+    setAccountModeState(mode);
+    const loaded = loadTransactions(mode);
+    setTransactions(loaded);
+
+    if (mode === 'demo') {
+      addToast('info', 'Alternado para Conta Demo (Ambiente de Simulação). Testes não afetam sua conta real.');
+    } else {
+      addToast('success', 'Alternado para Conta Real (Sua carteira oficial).');
+    }
   };
 
   // Keyboard shortcut for Escape to close all modals
@@ -230,6 +364,11 @@ export default function Home() {
         <LoginScreen
           userProfile={userProfile}
           onLoginSuccess={handleLoginSuccess}
+          onLoginGoogle={(user) => {
+            setFirebaseUser(user);
+            setIsLoggedIn(true);
+            sessionStorage.setItem('rf_session_active', 'true');
+          }}
           onClose={() => setIsLoggedIn(true)}
           onOpenRegister={() => setIsRegisterModalOpen(true)}
           onOpenForgot={() => setIsForgotModalOpen(true)}
@@ -248,6 +387,8 @@ export default function Home() {
         onOpenBackupModal={() => setIsBackupModalOpen(true)}
         onLogout={handleLogout}
         userProfile={userProfile}
+        accountMode={accountMode}
+        firebaseUser={firebaseUser}
       />
 
       {/* Main Content Area with bottom padding for mobile navigation */}
@@ -264,6 +405,7 @@ export default function Home() {
                 setIsTxModalOpen(true);
               }}
               onSearchAndRedirect={handleSearchAndRedirect}
+              onOpenCharts={() => setActiveTab('graficos')}
             />
           )}
 
@@ -292,6 +434,13 @@ export default function Home() {
             <BalanceteView
               transactions={transactions}
               onNotify={addToast}
+            />
+          )}
+
+          {activeTab === 'graficos' && (
+            <PortfolioCharts
+              transactions={transactions}
+              onNavigateToTab={(tab) => setActiveTab(tab)}
             />
           )}
         </div>
@@ -368,10 +517,18 @@ export default function Home() {
       />
 
       <ProfileModal
-        key={userProfile?.email || 'profile'}
+        key={`${userProfile?.email || 'profile'}-${accountMode}-${firebaseUser?.uid || 'guest'}`}
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         userProfile={userProfile}
+        accountMode={accountMode}
+        firebaseUser={firebaseUser}
+        onLoginGoogle={handleGoogleLogin}
+        onLogoutFirebase={handleGoogleLogout}
+        onSyncCloud={handleCloudSync}
+        onFetchCloud={handleCloudFetch}
+        isSyncingCloud={isSyncingCloud}
+        onSwitchAccountMode={handleSwitchAccountMode}
         onSaveProfile={handleSaveProfile}
         onNotify={addToast}
       />
@@ -393,6 +550,7 @@ export default function Home() {
         onClose={() => setIsBackupModalOpen(false)}
         transactions={transactions}
         userProfile={userProfile}
+        accountMode={accountMode}
         onRestoreData={handleRestoreData}
         onNotify={addToast}
       />

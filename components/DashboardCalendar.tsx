@@ -1,26 +1,113 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Transaction } from '@/lib/types';
 import { MONTH_NAMES_PT, formatMoney, formatDateBR } from '@/lib/formatters';
-import { ChevronLeft, ChevronRight, Search, PlusCircle, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, DollarSign } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  PlusCircle,
+  Calendar as CalendarIcon,
+  ArrowUpRight,
+  ArrowDownRight,
+  DollarSign,
+  TrendingUp,
+  PieChart as PieChartIcon,
+} from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts';
 
 interface DashboardCalendarProps {
   transactions: Transaction[];
   onOpenNewTransaction: (dateStr: string) => void;
   onSearchAndRedirect: (ticker: string) => void;
+  onOpenCharts?: () => void;
 }
+
+const DASHBOARD_CLASS_COLORS: Record<string, string> = {
+  'Ação': '#10B981',
+  'FII': '#3B82F6',
+  'BDR': '#8B5CF6',
+  'ETF': '#F59E0B',
+  'Renda Fixa': '#06B6D4',
+  'Outros': '#9CA3AF',
+};
 
 export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
   transactions,
   onOpenNewTransaction,
   onSearchAndRedirect,
+  onOpenCharts,
 }) => {
   const today = new Date();
   const [currentYear, setCurrentYear] = useState<number>(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState<number>(today.getMonth());
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDayDetails, setSelectedDayDetails] = useState<string | null>(null);
+  const [dashboardChartType, setDashboardChartType] = useState<'evolution' | 'distribution'>('evolution');
+
+  // Chart data calculations
+  const dashboardEvolutionData = useMemo(() => {
+    if (!transactions.length) return [];
+    const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+    let running = 0;
+    const map: Record<string, number> = {};
+    sorted.forEach(t => {
+      if (t.tipo === 'ENTRADA') running += t.valorTotal;
+      else if (t.tipo === 'SAIDA') running = Math.max(0, running - t.valorTotal);
+      map[t.date] = running;
+    });
+    return Object.entries(map).map(([date, val]) => ({
+      data: formatDateBR(date),
+      saldo: val,
+    }));
+  }, [transactions]);
+
+  const dashboardClassData = useMemo(() => {
+    if (!transactions.length) return [];
+    const classMap: Record<string, number> = {};
+    const assetHoldings: Record<string, { classe: string; custo: number; qtd: number }> = {};
+
+    transactions.forEach(t => {
+      if (!assetHoldings[t.ticker]) {
+        assetHoldings[t.ticker] = { classe: t.classe || 'Ação', custo: 0, qtd: 0 };
+      }
+      const item = assetHoldings[t.ticker];
+      if (t.tipo === 'ENTRADA') {
+        item.qtd += t.qtd;
+        item.custo += t.valorTotal;
+      } else if (t.tipo === 'SAIDA') {
+        const pm = item.qtd > 0 ? item.custo / item.qtd : 0;
+        item.qtd = Math.max(0, item.qtd - t.qtd);
+        item.custo = Math.max(0, item.custo - (t.qtd * pm));
+      }
+    });
+
+    Object.values(assetHoldings).forEach(a => {
+      if (a.qtd > 0 && a.custo > 0) {
+        classMap[a.classe] = (classMap[a.classe] || 0) + a.custo;
+      }
+    });
+
+    const total = Object.values(classMap).reduce((s, v) => s + v, 0) || 1;
+    return Object.entries(classMap).map(([name, value]) => ({
+      name,
+      value,
+      percent: ((value / total) * 100).toFixed(1),
+      color: DASHBOARD_CLASS_COLORS[name] || '#9CA3AF',
+    })).sort((a, b) => b.value - a.value);
+  }, [transactions]);
 
   // Years range
   const years: number[] = [];
@@ -420,6 +507,139 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Dashboard Interactive Chart Section (Recharts) */}
+      <div className="bg-[#141A16] border border-[#243027] rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#243027]">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-emerald-400" />
+              <span>Desempenho & Composição da Carteira</span>
+            </h3>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Acompanhe a curva de evolução patrimonial ou a distribuição de classes diretamente no painel
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center bg-[#0F1411] border border-[#243027] rounded-xl p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setDashboardChartType('evolution')}
+                className={`px-3 py-1 rounded-lg transition font-medium ${
+                  dashboardChartType === 'evolution'
+                    ? 'bg-emerald-500 text-black font-bold'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Evolução do Saldo
+              </button>
+              <button
+                type="button"
+                onClick={() => setDashboardChartType('distribution')}
+                className={`px-3 py-1 rounded-lg transition font-medium ${
+                  dashboardChartType === 'distribution'
+                    ? 'bg-emerald-500 text-black font-bold'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Distribuição
+              </button>
+            </div>
+
+            {onOpenCharts && (
+              <button
+                type="button"
+                onClick={onOpenCharts}
+                className="text-xs text-emerald-400 hover:text-emerald-300 font-bold px-3 py-1.5 rounded-xl border border-emerald-500/30 hover:bg-emerald-500/10 flex items-center gap-1.5 transition"
+              >
+                <PieChartIcon className="w-3.5 h-3.5" />
+                <span>Ver Todos os Gráficos</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {transactions.length === 0 ? (
+          <div className="p-8 text-center text-xs text-zinc-500">
+            Nenhuma movimentação registrada para gerar gráficos. Registre suas compras ou dividendos acima.
+          </div>
+        ) : dashboardChartType === 'evolution' ? (
+          <div className="w-full h-64 sm:h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={dashboardEvolutionData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="dashColorSaldo" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1F2A22" vertical={false} />
+                <XAxis dataKey="data" stroke="#6B7280" fontSize={11} tickLine={false} dy={6} />
+                <YAxis
+                  stroke="#6B7280"
+                  fontSize={11}
+                  tickLine={false}
+                  tickFormatter={(val) => `R$${(val / 1000).toFixed(0)}k`}
+                />
+                <Tooltip
+                  formatter={(value: any) => [`R$ ${formatMoney(Number(value))}`, 'Saldo Investido']}
+                  contentStyle={{ backgroundColor: '#141A16', borderColor: '#243027', borderRadius: '12px', fontSize: '12px' }}
+                  labelStyle={{ color: '#9CA3AF', fontWeight: 'bold' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="saldo"
+                  name="Saldo Investido"
+                  stroke="#10B981"
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill="url(#dashColorSaldo)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+            <div className="w-full h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={dashboardClassData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={85}
+                    paddingAngle={3}
+                  >
+                    {dashboardClassData.map((entry, index) => (
+                      <Cell key={`dash-cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(val: any) => [`R$ ${formatMoney(Number(val))}`, 'Alocação']}
+                    contentStyle={{ backgroundColor: '#141A16', borderColor: '#243027', borderRadius: '12px', fontSize: '12px' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {dashboardClassData.map(item => (
+                <div key={item.name} className="flex items-center gap-2 p-2 rounded-xl bg-[#0F1411] border border-[#243027]">
+                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                  <div className="truncate">
+                    <span className="text-xs font-semibold text-zinc-300 block truncate">{item.name}</span>
+                    <span className="text-[11px] text-zinc-400 font-bold">{item.percent}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
