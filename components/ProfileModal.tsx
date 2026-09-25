@@ -32,6 +32,7 @@ interface ProfileModalProps {
   isSyncingCloud?: boolean;
   onSwitchAccountMode: (mode: AccountMode) => void;
   onSaveProfile: (profile: UserProfile) => void;
+  onLogout?: () => void;
   onNotify: (type: 'success' | 'error' | 'info', msg: string) => void;
 }
 
@@ -48,6 +49,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   isSyncingCloud = false,
   onSwitchAccountMode,
   onSaveProfile,
+  onLogout,
   onNotify,
 }) => {
   const [nome, setNome] = useState(() => userProfile?.nome || '');
@@ -334,10 +336,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <div className="flex items-center gap-2 pt-2">
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 py-3 px-4 rounded-xl bg-[#0F1411] border border-[#243027] text-zinc-300 hover:text-white hover:bg-zinc-800 text-sm font-semibold transition"
+              onClick={() => {
+                onClose();
+                if (onLogout) {
+                  onLogout();
+                }
+              }}
+              className="flex-1 py-3 px-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 text-sm font-semibold transition flex items-center justify-center gap-2"
+              title="Sair do aplicativo para efetuar um novo login"
             >
-              Cancelar (X)
+              <LogOut className="w-4 h-4" />
+              <span>Sair do App</span>
             </button>
             <button
               type="submit"

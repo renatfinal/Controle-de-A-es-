@@ -25,9 +25,7 @@ import { ForgotModal } from '@/components/ForgotModal';
 import { BackupModal } from '@/components/BackupModal';
 import { LoginScreen } from '@/components/LoginScreen';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
-import { PWAInstallButton } from '@/components/PWAInstallButton';
 import { ToastContainer, ToastMessage } from '@/components/Toast';
-import { User } from 'lucide-react';
 import { useIsMounted } from '@/hooks/use-is-mounted';
 import {
   auth,
@@ -419,50 +417,6 @@ export default function Home() {
       {/* Main Content Area with bottom padding for mobile navigation */}
       <main className="flex-1 p-3.5 sm:p-4 md:p-8 max-w-7xl mx-auto w-full min-w-0 flex flex-col justify-between pb-24 md:pb-8">
         <div className="space-y-5 sm:space-y-6">
-          {/* Top Header Bar with PWA Install Button */}
-          <header className="flex items-center justify-between gap-3 pb-3 border-b border-[#243027]">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-black font-black text-xs flex items-center justify-center shadow-lg shadow-emerald-500/20 md:hidden">
-                RF
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm sm:text-base font-black text-white tracking-tight">
-                    RF Investimentos
-                  </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    accountMode === 'real'
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                  }`}>
-                    {accountMode === 'real' ? 'Modo Real' : 'Modo Demo'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-zinc-400 hidden sm:block">
-                  Gestão Patrimonial & Balancete • 100% Offline
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Install App Button in Top Header */}
-              <PWAInstallButton variant="header" />
-
-              {/* Profile quick button */}
-              <button
-                type="button"
-                onClick={() => setIsProfileModalOpen(true)}
-                className="px-2.5 py-1.5 rounded-xl bg-[#141A16] border border-[#243027] hover:border-emerald-500/40 text-zinc-300 hover:text-white transition flex items-center gap-1.5 text-xs"
-                title="Meu Perfil"
-              >
-                <User className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden sm:inline font-medium">
-                  {userProfile?.nome ? userProfile.nome.split(' ')[0] : 'Perfil'}
-                </span>
-              </button>
-            </div>
-          </header>
-
           {/* Active View */}
           {activeTab === 'dashboard' && (
             <DashboardCalendar
@@ -599,6 +553,7 @@ export default function Home() {
         isSyncingCloud={isSyncingCloud}
         onSwitchAccountMode={handleSwitchAccountMode}
         onSaveProfile={handleSaveProfile}
+        onLogout={handleLogout}
         onNotify={addToast}
       />
 
