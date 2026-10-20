@@ -8,7 +8,7 @@ import { X, Eye, EyeOff, UserPlus, Check } from 'lucide-react';
 interface RegisterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onRegister: (profile: UserProfile) => void;
+  onRegister: (profile: UserProfile) => Promise<void> | void;
 }
 
 export const RegisterModal: React.FC<RegisterModalProps> = ({
@@ -23,10 +23,11 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const [confirmSenha, setConfirmSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -35,19 +36,26 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       return;
     }
 
-    if (senha.length < 4) {
-      setError('A senha deve ter pelo menos 4 caracteres.');
+    if (senha.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres para segurança no Firebase.');
       return;
     }
 
-    onRegister({
-      nome: nome.trim(),
-      telefone: telefone.trim(),
-      email: email.trim().toLowerCase(),
-      senha: senha.trim(),
-    });
-
-    onClose();
+    try {
+      setIsSubmitting(true);
+      await onRegister({
+        nome: nome.trim(),
+        telefone: telefone.trim(),
+        email: email.trim().toLowerCase(),
+        senha: senha.trim(),
+      });
+      onClose();
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e?.message || 'Erro ao realizar cadastro no Firebase.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -175,10 +183,11 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             </button>
             <button
               type="submit"
-              className="flex-[2] bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+              disabled={isSubmitting}
+              className="flex-[2] bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-bold py-3 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
             >
               <Check className="w-4 h-4" />
-              <span>Finalizar Cadastro</span>
+              <span>{isSubmitting ? 'Salvando no Firebase...' : 'Finalizar Cadastro'}</span>
             </button>
           </div>
         </form>

@@ -1,8 +1,19 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, User } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  User,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+  sendPasswordResetEmail
+} from 'firebase/auth';
 import {
   getFirestore,
   doc,
+  getDoc,
   getDocFromServer,
   collection,
   getDocs,
@@ -114,6 +125,11 @@ export async function loginWithGoogle(): Promise<User | null> {
     if (err?.code === 'auth/popup-blocked') {
       console.warn('Google Sign-in popup blocked by browser.');
       throw new Error('A janela pop-up foi bloqueada pelo navegador. Permita pop-ups para autenticar com o Google.');
+    }
+    if (err?.code === 'auth/unauthorized-domain' || (err?.message && err.message.includes('auth/unauthorized-domain'))) {
+      const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'seu domínio';
+      console.warn('Firebase auth/unauthorized-domain for host:', currentHost);
+      throw new Error(`Domínio não autorizado no Firebase (${currentHost}). Adicione este domínio no Firebase Console > Authentication > Settings > Authorized domains.`);
     }
     console.warn('Google Sign-in did not complete:', err?.message || error);
     throw error;
@@ -229,3 +245,126 @@ export async function syncProfileToCloud(userId: string, profile: UserProfile): 
     handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
+
+// Fetch User Profile from Cloud
+export async function fetchProfileFromCloud(userId: string): Promise<UserProfile | null> {
+  if (!userId) return null;
+  const path = `users/${userId}/profile/main`;
+  try {
+    const snap = await getDoc(doc(db, 'users', userId, 'profile', 'main'));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return {
+      nome: data.nome || '',
+      telefone: data.telefone || '',
+      email: data.email || '',
+      senha: '', // passwords never stored in firestore
+    };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, path);
+  }
+}
+
+// Register with Email and Password
+export async function registerWithEmailPassword(
+  email: string,
+  password: string,
+  nome?: string,
+  telefone?: string
+): Promise<{ user: User; profile: UserProfile }> {
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+    if (nome && cred.user) {
+      try {
+        await updateProfile(cred.user, { displayName: nome });
+      } catch (e) {
+        console.warn('Could not update displayName:', e);
+      }
+    }
+
+    const profile: UserProfile = {
+      nome: nome || '',
+      telefone: telefone || '',
+      email: cleanEmail,
+      senha: password,
+    };
+
+    // Save profile to Firestore immediately
+    await syncProfileToCloud(cred.user.uid, profile);
+
+    return { user: cred.user, profile };
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string };
+    if (err.code === 'auth/email-already-in-use') {
+      throw new Error('Este e-mail já está cadastrado. Faça login ou recupere sua senha.');
+    }
+    if (err.code === 'auth/weak-password') {
+      throw new Error('A senha é muito fraca. Digite pelo menos 6 caracteres.');
+    }
+    if (err.code === 'auth/invalid-email') {
+      throw new Error('O formato do e-mail é inválido.');
+    }
+    throw error;
+  }
+}
+
+// Login with Email and Password across devices
+export async function loginWithEmailPassword(
+  email: string,
+  password: string
+): Promise<{ user: User; profile: UserProfile; transactions: Transaction[] }> {
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+    const userId = cred.user.uid;
+
+    // Load user profile from Firestore or fallback to user credentials
+    let cloudProfile: UserProfile | null = null;
+    try {
+      cloudProfile = await fetchProfileFromCloud(userId);
+    } catch (e) {
+      console.warn('Could not fetch cloud profile, using auth info:', e);
+    }
+
+    const profile: UserProfile = {
+      nome: cloudProfile?.nome || cred.user.displayName || cleanEmail.split('@')[0],
+      telefone: cloudProfile?.telefone || '',
+      email: cleanEmail,
+      senha: password,
+    };
+
+    // Load transactions from Firestore
+    let transactions: Transaction[] = [];
+    try {
+      transactions = await fetchTransactionsFromCloud(userId, 'real') || [];
+    } catch (e) {
+      console.warn('Could not fetch cloud transactions:', e);
+    }
+
+    return { user: cred.user, profile, transactions };
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string };
+    if (
+      err.code === 'auth/invalid-credential' ||
+      err.code === 'auth/user-not-found' ||
+      err.code === 'auth/wrong-password'
+    ) {
+      throw new Error('E-mail ou senha incorretos no banco de dados. Verifique suas credenciais.');
+    }
+    if (err.code === 'auth/invalid-email') {
+      throw new Error('O formato do e-mail é inválido.');
+    }
+    if (err.code === 'auth/too-many-requests') {
+      throw new Error('Muitas tentativas sem sucesso. Aguarde alguns instantes e tente novamente.');
+    }
+    throw error;
+  }
+}
+
+// Send Password Reset Email
+export async function sendResetPassword(email: string): Promise<void> {
+  const cleanEmail = email.trim().toLowerCase();
+  await sendPasswordResetEmail(auth, cleanEmail);
+}
+

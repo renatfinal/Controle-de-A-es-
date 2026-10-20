@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { UserProfile } from '@/lib/types';
-import { loginWithGoogle, isAuthCancellation } from '@/lib/firebase';
+import { UserProfile, Transaction } from '@/lib/types';
+import { loginWithGoogle, loginWithEmailPassword, isAuthCancellation } from '@/lib/firebase';
 import { User } from 'firebase/auth';
 import { Eye, EyeOff, ShieldCheck, ArrowRight, Sparkles, X } from 'lucide-react';
 
 interface LoginScreenProps {
   userProfile: UserProfile | null;
-  onLoginSuccess: () => void;
+  onLoginSuccess: (user?: User, profile?: UserProfile, cloudTxs?: Transaction[]) => void;
   onLoginGoogle?: (user: User) => void;
   onClose?: () => void;
   onOpenRegister: () => void;
@@ -30,6 +30,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoggingInGoogle, setIsLoggingInGoogle] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const handleGoogleLogin = async () => {
     try {
@@ -38,7 +39,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       const user = await loginWithGoogle();
       if (user) {
         onLoginGoogle?.(user);
-        onLoginSuccess();
+        onLoginSuccess(user);
         onNotify('success', `Conectado ao Firebase com: ${user.email}`);
       }
     } catch (err: unknown) {
@@ -53,24 +54,38 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
-    // If no user exists yet, allow registering or quick demo
-    if (!userProfile || !userProfile.email) {
-      setErrorMsg('Nenhum usuário cadastrado ainda. Clique em "Cadastrar-se" ou use o "Acesso Rápido".');
+    if (!email.trim() || !senha) {
+      setErrorMsg('Preencha seu e-mail e senha.');
       return;
     }
 
-    if (
-      email.trim().toLowerCase() === userProfile.email.trim().toLowerCase() &&
-      senha === userProfile.senha
-    ) {
-      onLoginSuccess();
-      onNotify('success', `Bem-vindo de volta, ${userProfile.nome.split(' ')[0] || 'Investidor'}!`);
-    } else {
-      setErrorMsg('E-mail ou senha incorretos. Verifique suas credenciais.');
+    try {
+      setIsLoggingIn(true);
+      // Attempt login via Firebase Auth (cross-device cloud sync)
+      const { user, profile, transactions } = await loginWithEmailPassword(email, senha);
+      onLoginSuccess(user, profile, transactions);
+      onNotify('success', `Bem-vindo de volta, ${profile.nome.split(' ')[0] || 'Investidor'}! Dados sincronizados.`);
+    } catch (firebaseErr: unknown) {
+      console.warn('Firebase login error:', firebaseErr);
+      // Fallback: check local profile if user is offline or registered locally
+      if (
+        userProfile &&
+        userProfile.email &&
+        email.trim().toLowerCase() === userProfile.email.trim().toLowerCase() &&
+        senha === userProfile.senha
+      ) {
+        onLoginSuccess();
+        onNotify('success', `Acesso liberado (modo offline)!`);
+        return;
+      }
+      const err = firebaseErr as { message?: string };
+      setErrorMsg(err?.message || 'E-mail ou senha incorretos.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -194,9 +209,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
           <button
             type="submit"
-            className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 mt-1"
+            disabled={isLoggingIn}
+            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-bold py-3 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 mt-1"
           >
-            <span>Entrar no Sistema</span>
+            <span>{isLoggingIn ? 'Conectando ao Firebase...' : 'Entrar no Sistema'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 
