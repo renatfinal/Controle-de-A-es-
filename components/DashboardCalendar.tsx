@@ -14,6 +14,7 @@ import {
   DollarSign,
   TrendingUp,
   PieChart as PieChartIcon,
+  Edit2,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -31,6 +32,7 @@ import {
 interface DashboardCalendarProps {
   transactions: Transaction[];
   onOpenNewTransaction: (dateStr: string) => void;
+  onEditTransaction?: (tx: Transaction) => void;
   onSearchAndRedirect: (ticker: string) => void;
   onOpenCharts?: () => void;
 }
@@ -47,6 +49,7 @@ const DASHBOARD_CLASS_COLORS: Record<string, string> = {
 export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
   transactions,
   onOpenNewTransaction,
+  onEditTransaction,
   onSearchAndRedirect,
   onOpenCharts,
 }) => {
@@ -404,12 +407,26 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
                       <span className="text-zinc-400 truncate hidden sm:inline">{tx.nome}</span>
                     </div>
 
-                    <div className="text-right flex-shrink-0">
-                      {tx.tipo !== 'DIVIDENDO' && tx.valorTotal > 0 && (
-                        <div className="font-semibold text-white">R$ {formatMoney(tx.valorTotal)}</div>
-                      )}
-                      {tx.dividendo > 0 && (
-                        <div className="text-emerald-400 font-semibold">+ R$ {formatMoney(tx.dividendo)}</div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="text-right">
+                        {tx.tipo !== 'DIVIDENDO' && tx.valorTotal > 0 && (
+                          <div className="font-semibold text-white">R$ {formatMoney(tx.valorTotal)}</div>
+                        )}
+                        {tx.dividendo > 0 && (
+                          <div className="text-emerald-400 font-semibold">+ R$ {formatMoney(tx.dividendo)}</div>
+                        )}
+                      </div>
+
+                      {onEditTransaction && (
+                        <button
+                          type="button"
+                          onClick={() => onEditTransaction(tx)}
+                          className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 transition flex items-center justify-center shadow-sm"
+                          title="Editar este lançamento"
+                          aria-label="Editar lançamento"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-blue-400" />
+                        </button>
                       )}
                     </div>
                   </div>

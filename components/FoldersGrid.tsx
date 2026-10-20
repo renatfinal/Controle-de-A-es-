@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction } from '@/lib/types';
 import { formatMoney } from '@/lib/formatters';
-import { FolderKanban, MoreVertical, Plus, Edit3, DollarSign, ArrowUpRight, Search, TrendingUp } from 'lucide-react';
+import { FolderKanban, MoreVertical, Plus, Edit2, Edit3, DollarSign, ArrowUpRight, Search, TrendingUp } from 'lucide-react';
 
 interface FoldersGridProps {
   transactions: Transaction[];
@@ -223,10 +223,10 @@ export const FoldersGrid: React.FC<FoldersGridProps> = ({
                               setActiveMenuTicker(null);
                               onOpenEditTicker(item.ticker);
                             }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-200 hover:text-white hover:bg-emerald-500/20 rounded-lg transition"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-200 hover:text-white hover:bg-blue-500/20 rounded-lg transition"
                           >
-                            <Edit3 className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Ver / Excluir Lançamentos</span>
+                            <Edit3 className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Ver / Editar Lançamentos</span>
                           </button>
 
                           <button
@@ -280,9 +280,23 @@ export const FoldersGrid: React.FC<FoldersGridProps> = ({
 
                     <div className="flex items-center justify-between">
                       <span className="text-zinc-400">Proventos Recebidos:</span>
-                      <span className="font-bold text-yellow-300 flex items-center gap-1">
-                        R$ {formatMoney(item.dividendos)}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-yellow-300">
+                          R$ {formatMoney(item.dividendos)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenEditTicker(item.ticker);
+                          }}
+                          className="p-1 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 transition flex items-center justify-center shadow-sm"
+                          title={`Editar proventos e lançamentos de ${item.ticker}`}
+                          aria-label="Editar proventos"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-blue-400" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Transaction, TransactionType, AssetClass } from '@/lib/types';
 import { maskCurrency, parseCurrencyValue, formatMoney } from '@/lib/formatters';
 import { X, Check } from 'lucide-react';
@@ -22,6 +22,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   initialTicker,
   editingTransaction,
 }) => {
+  const qtdInputRef = useRef<HTMLInputElement>(null);
+  const valorUnInputRef = useRef<HTMLInputElement>(null);
+  const dividendoInputRef = useRef<HTMLInputElement>(null);
+
   const [date, setDate] = useState<string>(() => {
     if (editingTransaction) return editingTransaction.date;
     return initialDate || new Date().toISOString().slice(0, 10);
@@ -112,7 +116,22 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              const target = e.target as HTMLElement;
+              if (target === qtdInputRef.current) {
+                e.preventDefault();
+                valorUnInputRef.current?.focus();
+              } else if (target === valorUnInputRef.current) {
+                e.preventDefault();
+                dividendoInputRef.current?.focus();
+              }
+            }
+          }}
+          className="space-y-4"
+        >
           {/* Data */}
           <div>
             <label className="text-xs font-semibold text-zinc-400 block mb-1">
@@ -228,11 +247,20 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     Quantidade
                   </label>
                   <input
-                    type="number"
+                    ref={qtdInputRef}
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    enterKeyHint="next"
                     value={qtd}
-                    onChange={(e) => setQtd(e.target.value)}
+                    onChange={(e) => setQtd(e.target.value.replace(/\D/g, ''))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.keyCode === 13) {
+                        e.preventDefault();
+                        valorUnInputRef.current?.focus();
+                      }
+                    }}
                     placeholder="Ex: 100"
-                    min="1"
                     required
                     className="w-full bg-[#0F1411] border border-[#243027] text-white text-sm rounded-xl px-3.5 py-2.5 outline-none focus:border-emerald-500 transition"
                   />
@@ -243,9 +271,18 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     Preço Unitário (R$)
                   </label>
                   <input
+                    ref={valorUnInputRef}
                     type="text"
+                    inputMode="decimal"
+                    enterKeyHint="next"
                     value={valorUn}
                     onChange={(e) => setValorUn(maskCurrency(e.target.value))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        dividendoInputRef.current?.focus();
+                      }
+                    }}
                     placeholder="0,00"
                     required
                     className="w-full bg-[#0F1411] border border-[#243027] text-white text-sm rounded-xl px-3.5 py-2.5 outline-none focus:border-emerald-500 transition"
@@ -271,7 +308,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               Proventos / Dividendos (R$)
             </label>
             <input
+              ref={dividendoInputRef}
               type="text"
+              inputMode="decimal"
+              enterKeyHint="done"
               value={dividendo}
               onChange={(e) => setDividendo(maskCurrency(e.target.value))}
               placeholder="0,00"

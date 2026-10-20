@@ -83,6 +83,8 @@ export const DividendModal: React.FC<DividendModalProps> = ({
             </label>
             <input
               type="text"
+              inputMode="decimal"
+              enterKeyHint="done"
               value={value}
               onChange={(e) => setValue(maskCurrency(e.target.value))}
               placeholder="0,00"

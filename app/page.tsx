@@ -428,6 +428,10 @@ export default function Home() {
                 setTxModalDate(dateStr);
                 setIsTxModalOpen(true);
               }}
+              onEditTransaction={(tx) => {
+                setEditingTx(tx);
+                setIsTxModalOpen(true);
+              }}
               onSearchAndRedirect={handleSearchAndRedirect}
               onOpenCharts={() => setActiveTab('graficos')}
             />
@@ -458,6 +462,10 @@ export default function Home() {
             <BalanceteView
               transactions={transactions}
               onNotify={addToast}
+              onOpenEditTicker={(ticker) => {
+                setEditTicker(ticker);
+                setIsEditTickerModalOpen(true);
+              }}
             />
           )}
 

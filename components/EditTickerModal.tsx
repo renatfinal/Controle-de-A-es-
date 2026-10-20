@@ -86,7 +86,7 @@ export const EditTickerModal: React.FC<EditTickerModalProps> = ({
         {/* Toolbar */}
         <div className="flex items-center justify-between py-3 gap-2 flex-wrap">
           <p className="text-xs text-zinc-400">
-            Clique na lixeira para excluir ou no lápis para editar.
+            Clique no lápis azul para editar ou na lixeira para excluir.
           </p>
 
           <div className="flex items-center gap-2">
@@ -222,11 +222,11 @@ export const EditTickerModal: React.FC<EditTickerModalProps> = ({
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       onClick={() => onEditTransaction(tx)}
-                      className="w-10 h-10 rounded-xl bg-[#141A16] border border-[#243027] text-zinc-300 hover:text-white hover:border-emerald-500/50 flex items-center justify-center transition"
+                      className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/40 text-blue-400 hover:text-blue-300 hover:bg-blue-500/25 hover:border-blue-500/70 flex items-center justify-center transition shadow-sm"
                       title="Editar este lançamento"
                       aria-label="Editar este lançamento"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 className="w-4 h-4 text-blue-400" />
                     </button>
 
                     <button
