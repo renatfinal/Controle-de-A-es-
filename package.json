@@ -36,7 +36,6 @@
     "@types/react-dom": "^19",
     "eslint": "9.39.1",
     "eslint-config-next": "16.0.8",
-    "firebase-tools": "^15.0.0",
     "serwist": "^9.5.12",
     "sharp": "^0.35.4",
     "tailwindcss": "4.1.11",

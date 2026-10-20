@@ -68,13 +68,20 @@ export const DividendModal: React.FC<DividendModalProps> = ({
             <label className="text-xs font-semibold text-zinc-400 block mb-1">
               Data do Recebimento
             </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              className="w-full bg-[#0F1411] border border-[#243027] text-white text-sm rounded-xl px-3.5 py-2.5 outline-none focus:border-emerald-500 cursor-pointer transition"
-            />
+            <div className="relative">
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                onClick={(e) => {
+                  try {
+                    (e.currentTarget as HTMLInputElement).showPicker();
+                  } catch {}
+                }}
+                required
+                className="w-full bg-[#0F1411] border border-[#243027] text-white text-sm rounded-xl px-3.5 py-2.5 outline-none focus:border-emerald-500 cursor-pointer transition [color-scheme:dark]"
+              />
+            </div>
           </div>
 
           <div>

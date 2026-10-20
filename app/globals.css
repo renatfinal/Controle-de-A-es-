@@ -2,6 +2,7 @@
 
 @layer base {
   :root {
+    color-scheme: dark;
     --bg-main: #0B0F0C;
     --bg-card: #141A16;
     --bg-modal: #1C241E;
@@ -43,3 +44,26 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #324436;
 }
+
+/* Custom styling for date inputs to ensure calendar icon is always visible and matches the emerald theme */
+input[type="date"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(72%) sepia(51%) saturate(543%) hue-rotate(110deg) brightness(101%) contrast(93%);
+  opacity: 1 !important;
+  display: block;
+  font-size: 1.15rem;
+  padding: 4px;
+  border-radius: 6px;
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(85%) sepia(70%) saturate(600%) hue-rotate(105deg) brightness(115%) contrast(100%);
+  transform: scale(1.05);
+}
+
+
